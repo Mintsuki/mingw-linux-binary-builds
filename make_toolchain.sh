@@ -105,7 +105,7 @@ cd build-mingw-headers
     --with-default-msvcrt=msvcrt \
     --with-default-win32-winnt=0x0400
 $MAKE install
-ln -sfn "$PREFIX/$TARGET" "$PREFIX/mingw"
+ln -sfn "$TARGET" "$PREFIX/mingw"
 cd ..
 
 cd gcc-$GCCVERSION
