@@ -18,8 +18,7 @@ jobs:
 
     steps:
       - name: Install dependencies
-        run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S base-devel git autoconf automake
-wget bison flex texinfo file
+        run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S base-devel git autoconf automake wget bison flex texinfo file
 
       - name: Checkout code
         uses: actions/checkout@v6
