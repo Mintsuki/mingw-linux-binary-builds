@@ -1,0 +1,63 @@
+name: Build MinGW toolchains
+
+on:
+  push:
+    branches:
+      - 'trunk'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        arch: [i486, i586, i686]
+
+    name: Build MinGW toolchain for ${{matrix.arch}}
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+
+    steps:
+      - name: Install dependencies
+        run: pacman --noconfirm -Syu && pacman --needed --noconfirm -S base-devel git autoconf automake
+wget bison flex texinfo file
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Git config
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Set up variables
+        run: |
+          echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          echo 'BINUTILSVERSION=2.46.0' >> $GITHUB_ENV
+          echo 'GCCVERSION=15.2.0' >> $GITHUB_ENV
+          echo 'MINGWVERSION=14.0.0' >> $GITHUB_ENV
+
+      - name: Build toolchain for ${{matrix.arch}}
+        run: ARCH=${{matrix.arch}} ./make_toolchain.sh
+
+      - name: Pack toolchain into tarball
+        run: |
+          set -e
+          mv toolchain/output mingw-${{matrix.arch}}
+          tar -Jcvf mingw-${{matrix.arch}}.tar.xz mingw-${{matrix.arch}}
+
+      - name: Tag new release
+        run: git tag $TAG_DATE && git push --tags
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: MinGW binary build ${{env.TAG_DATE}}
+          tag_name: ${{env.TAG_DATE}}
+          body: |
+            MinGW cross-compiler toolchains for 32-bit Windows.
+
+            This build is based on:
+              - GNU Binutils ${{env.BINUTILSVERSION}}
+              - GCC ${{env.GCCVERSION}}
+              - MinGW ${{env.MINGWVERSION}}
+          files: mingw-${{matrix.arch}}.tar.xz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
