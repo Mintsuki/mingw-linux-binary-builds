@@ -163,9 +163,10 @@ cd build-gcc
     --with-sysroot="$PREFIX" \
     --with-arch="$ARCH" \
     --enable-languages=c,c++ \
+    --enable-sjlj-exceptions \
     --disable-nls \
     --disable-multilib \
-    --enable-threads=win32 \
+    --enable-threads=single \
     --enable-shared \
     --enable-static \
     --enable-fully-dynamic-string \
