@@ -46,7 +46,7 @@ jobs:
         run: git tag $TAG_DATE && git push --tags
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: MinGW binary build ${{env.TAG_DATE}}
           tag_name: ${{env.TAG_DATE}}
