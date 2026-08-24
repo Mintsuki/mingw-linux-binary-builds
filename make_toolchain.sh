@@ -8,20 +8,18 @@ srcdir="$(cd "${srcdir}" && pwd -P)"
 
 cd "$srcdir"
 
-if [ -z "$ARCH" ]; then
+if [ -z "$TARGET" ]; then
     set +x
-    echo "ARCH not specified"
+    echo "TARGET not specified"
     exit 1
 fi
 
-TARGET=$ARCH-w64-mingw32
-
 if [ -z "$BINUTILSVERSION" ]; then
-    BINUTILSVERSION=2.46.0
+    BINUTILSVERSION=2.47
 fi
 
 if [ -z "$GCCVERSION" ]; then
-    GCCVERSION=15.2.0
+    GCCVERSION=16.2.0
 fi
 
 if [ -z "$MINGWVERSION" ]; then
@@ -63,11 +61,11 @@ export PATH="$PREFIX/bin:$PATH"
 
 if [ ! -f binutils-$BINUTILSVERSION.tar.xz ]; then
     curl -Lo binutils-$BINUTILSVERSION.tar.xz https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILSVERSION.tar.xz
-    b2sum binutils-$BINUTILSVERSION.tar.xz | grep -q 9f4fd8897d237eb5003bdf439537dfc5f8c681e9ff939fb06bb8235ed298031ea4cc91611edb640ffc432199d5791289d003fe0d07acce80327dc40595a5eb9e
+    b2sum binutils-$BINUTILSVERSION.tar.xz | grep -q 329cae8792c500c71d8cce03aab127e8d77f1d409f74872082e64df5163e5c730fe585f8f9c21905cb6227cae18e6675ae4caed653223a26b5d9d4fdb90910ea
 fi
 if [ ! -f gcc-$GCCVERSION.tar.xz ]; then
     curl -Lo gcc-$GCCVERSION.tar.xz https://ftp.gnu.org/gnu/gcc/gcc-$GCCVERSION/gcc-$GCCVERSION.tar.xz
-    b2sum gcc-$GCCVERSION.tar.xz | grep -q e270320978ca690e6e8f5ef06414dc13caf561f16403a3783c76fbf3dcee57e755a2d5bba922bf7fcae0bb6120443755d819b003791ae823d54589dd799804de
+    b2sum gcc-$GCCVERSION.tar.xz | grep -q ab3ffe16e042da767f3f1eac170da518d6d7de3b0f92e068f79e3bf25fdc0bdf56eea0cd586bd4b9b6e9baebadd110c2ebd77b75c99c45853814f4bea5a98ef0
 fi
 if [ ! -f mingw-w64-$MINGWVERSION.tar.gz ]; then
     curl -Lo mingw-w64-$MINGWVERSION.tar.gz https://github.com/mingw-w64/mingw-w64/archive/refs/tags/v$MINGWVERSION.tar.gz
@@ -82,6 +80,13 @@ $TAR -xf ../binutils-$BINUTILSVERSION.tar.xz
 $TAR -xf ../gcc-$GCCVERSION.tar.xz
 $TAR -xf ../mingw-w64-$MINGWVERSION.tar.gz
 
+cd binutils-$BINUTILSVERSION
+# Apply patches, if any
+for patch in "${srcdir}"/toolchain-patches/binutils/*; do
+    [ "${patch}" = "${srcdir}/toolchain-patches/binutils/*" ] && break
+    patch -p1 < "${patch}"
+done
+cd ..
 mkdir build-binutils
 cd build-binutils
 ../binutils-$BINUTILSVERSION/configure \
@@ -97,6 +102,14 @@ $MAKE
 $MAKE install
 cd ..
 
+cd mingw-w64-$MINGWVERSION
+# Apply patches, if any
+for patch in "${srcdir}"/toolchain-patches/mingw/*; do
+    [ "${patch}" = "${srcdir}/toolchain-patches/mingw/*" ] && break
+    patch -p1 < "${patch}"
+done
+cd ..
+
 mkdir build-mingw-headers
 cd build-mingw-headers
 ../mingw-w64-$MINGWVERSION/mingw-w64-headers/configure \
@@ -109,6 +122,11 @@ ln -sfn "$TARGET" "$PREFIX/mingw"
 cd ..
 
 cd gcc-$GCCVERSION
+# Apply patches, if any
+for patch in "${srcdir}"/toolchain-patches/gcc/*; do
+    [ "${patch}" = "${srcdir}/toolchain-patches/gcc/*" ] && break
+    patch -p1 < "${patch}"
+done
 ./contrib/download_prerequisites
 cd ..
 
