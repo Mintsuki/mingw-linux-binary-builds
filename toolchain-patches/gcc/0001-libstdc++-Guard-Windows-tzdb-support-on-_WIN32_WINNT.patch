@@ -1,0 +1,70 @@
+Subject: [PATCH] libstdc++: Guard Windows current_zone() on _WIN32_WINNT
+
+GCC 16 added a Windows implementation of std::chrono::current_zone()
+(libstdc++-v3 ChangeLog-2025, 2025-07-15, PR libstdc++/108409).  It calls
+GetDynamicTimeZoneInformation(), which mingw-w64 only declares for
+_WIN32_WINNT >= 0x0600 (Windows Vista).
+
+This toolchain configures the mingw-w64 headers with
+--with-default-win32-winnt=0x0400, so building libstdc++ fails with:
+
+  tzdb.cc: In function 'std::string_view
+    std::chrono::{anonymous}::detect_windows_zone()':
+  tzdb.cc:2198:11: error: 'GetDynamicTimeZoneInformation' was not declared
+    in this scope; did you mean 'GetTimeZoneInformation'?
+
+libstdc++ only raises _WIN32_WINNT to 0x0600 itself when the win32 gthreads
+model is used (see GLIBCXX_CHECK_GTHREADS in acinclude.m4); with
+--enable-threads=single that does not happen and the new code is compiled
+against whatever the target defaults to.
+
+Compile the Windows zone detection only when the targeted Windows version
+actually provides the API.  When it does not, current_zone() falls through
+to the UTC default that the generic code already uses when no zone can be
+determined.  Everything else in <chrono>, including locate_zone() and the
+lookup of the tzdata files next to the loaded module, is unaffected.
+
+This is a no-op for the usual _WIN32_WINNT >= 0x0600 builds.
+
+Not submitted upstream yet; upstream master still has the unguarded call.
+
+--- a/libstdc++-v3/src/c++20/tzdb.cc
++++ b/libstdc++-v3/src/c++20/tzdb.cc
+@@ -55,6 +55,12 @@
+ # include <psapi.h>
+ 
+ # include <array>
++
++// Detecting the current time zone uses GetDynamicTimeZoneInformation, which
++// mingw-w64 only declares when targeting Windows Vista or later.
++# if !defined _WIN32_WINNT || _WIN32_WINNT >= 0x0600
++#  define _GLIBCXX_USE_WINDOWS_CURRENT_ZONE 1
++# endif
+ #endif
+ 
+ #if defined __GTHREADS && ATOMIC_POINTER_LOCK_FREE == 2
+@@ -2190,7 +2196,7 @@
+       return nullptr; // not found
+     }
+ 
+-#ifdef _GLIBCXX_HAVE_WINDOWS_H
++#ifdef _GLIBCXX_USE_WINDOWS_CURRENT_ZONE
+     string_view
+     detect_windows_zone() noexcept
+     {
+@@ -2424,10 +2430,14 @@
+     // zone files in /usr/share/zoneinfo so we need to compare its contents
+     // to each one until we find a match.
+ 
+-#elif defined(_GLIBCXX_HAVE_WINDOWS_H)
++#elif defined(_GLIBCXX_USE_WINDOWS_CURRENT_ZONE)
+     if (auto tz
+ 	= do_locate_zone(this->zones, this->links, detect_windows_zone()))
+       return tz;
++#elif defined(_GLIBCXX_HAVE_WINDOWS_H)
++    // Targeting a Windows version that predates
++    // GetDynamicTimeZoneInformation, so the current zone cannot be detected.
++    // Fall through to the UTC default below.
+ #else // defined(_AIX)
+     // AIX stores current zone in $TZ in /etc/environment but the value
+     // is typically a POSIX time zone name, not IANA zone.
